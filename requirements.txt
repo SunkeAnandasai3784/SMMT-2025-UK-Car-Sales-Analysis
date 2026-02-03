@@ -1,0 +1,22 @@
+# Python dependencies for SMMT 2025 UK Car Sales Analysis
+
+# Core data manipulation
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Data visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Machine learning
+scikit-learn>=1.2.0
+
+# Excel file handling
+openpyxl>=3.1.0
+
+# Jupyter notebook support
+jupyter>=1.0.0
+ipykernel>=6.20.0
+
+# Additional utilities
+zipfile36>=0.1.3
