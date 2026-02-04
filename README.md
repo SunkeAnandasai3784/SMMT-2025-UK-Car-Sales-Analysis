@@ -33,32 +33,6 @@ The core starting dataset is the SMMT `Cars_12_2025.xlsx` file (sheet `CARS_Mont
 
 - Simple quarterly series `bank_rate` (e.g. Bank of England interest rate) constructed/loaded and merged by `YearQuarter` into the DVLA panel.
 
-## Repository Structure
-
-```text
-.
-├── data/
-│   ├── raw/
-│   │   ├── Full-year-car-registrations-2025.zip
-│   │   └── df_VEH0160_UK.csv
-│   └── processed/
-│       ├── smmt_clean.csv
-│       └── dvla_with_lags_long.csv
-├── notebooks/
-│   ├── 01_SMMT_2025_EDA_and_RF.ipynb
-│   ├── 02_DVLA_lags_and_regression.ipynb
-│   └── 03_Macro_and_time_series_models.ipynb
-├── src/
-│   ├── dsutils.py                 # shared helpers: loading, lag creation, time splits, RF pipelines
-│   ├── data_preparation.py        # (optional) SMMT-specific cleaning logic
-│   ├── features.py                # (optional) feature engineering helpers
-│   └── model_random_forest.py     # (optional) model wrapper
-├── reports/
-│   ├── figures/                   # exported plots for the dissertation
-│   └── tables/                    # CSVs with final metrics / summaries
-├── README.md
-└── requirements.txt
-
 The `src/dsutils.py` module provides reusable functionality for loading data, creating lag features, splitting by time, building RF pipelines, and evaluating regression models.
 
 ## Notebook 01 – SMMT 2025 EDA and RF Classification
@@ -189,3 +163,32 @@ m = Prophet()
 m.fit(ts_df[["ds", "y"]])
 future = m.make_future_dataframe(periods=4, freq="Q")
 forecast = m.predict(future)
+
+## Repository Structure
+
+```text
+.
+├── data/
+│   ├── raw/
+│   │   ├── Full-year-car-registrations-2025.zip
+│   │   └── df_VEH0160_UK.csv
+│   └── processed/
+│       ├── smmt_clean.csv
+│       └── dvla_with_lags_long.csv
+├── notebooks/
+│   ├── 01_SMMT_2025_EDA_and_RF.ipynb
+│   ├── 02_DVLA_lags_and_regression.ipynb
+│   └── 03_Macro_and_time_series_models.ipynb
+├── src/
+│   ├── dsutils.py
+│   ├── data_preparation.py
+│   ├── features.py
+│   └── model_random_forest.py
+├── reports/
+│   ├── figures/
+│   └── tables/
+├── README.md
+└── requirements.txt
+
+
+
