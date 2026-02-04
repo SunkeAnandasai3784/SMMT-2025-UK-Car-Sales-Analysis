@@ -147,4 +147,22 @@ Cross-validated mean ROC-AUC: 0.99, with test performance remaining at 1.0 for a
 
 Anandasai Sunke
 
+## Interpreting the Random Forest performance
+
+The cleaned dataset contains 58 manufacturers (51 rows after removing inf/NaN rows), with very strong correlations between the YTD volume/share features and the `Purchase` label. This means that, for this dataset, high vs low sales status is almost fully determined by a small set of highly informative numeric variables. The learning curves show that the tuned Random Forest reaches training ROC-AUC approximately 1.0 for all training sizes, while the validation ROC-AUC remains very high (approximately 0.97-0.99) with a wide variance band due to the small sample. Combined with a perfect confusion matrix on just 12 test samples, this indicates that the model can almost perfectly separate the classes on both training and validation folds, and that the task is nearly deterministic on the available data rather than evidence of strong generalisation to a much larger, more diverse population.
+
+## Feature importances and leakage check
+
+The Random Forest feature importances confirm that the strongest predictors are exactly the variables highlighted in the correlation analysis: `ytd_2025`, `ytd_share_2025`, `ytd_2024`, `ytd_share_2024`, and the engineered growth / momentum features derived from them. I have explicitly checked that none of the engineered features directly encode the `Purchase` or `High_Sales` labels, and that all features used in modelling are computed purely from sales and market-share information available before the target is defined. This alignment between the correlation heatmap and the importance ranking, together with the absence of any target-derived fields in `feature_cols`, provides reassurance that there is no data leakage from the label into the predictors.
+
+## Future work: complementary dataset and deep learning extension
+
+A key limitation of the current work is the very small sample size (58 manufacturers) and the almost deterministic relationship between YTD / share features and the `Purchase` label. To address this, I plan to extend the analysis with a complementary dataset rather than starting a new project. In particular, I will:
+
+- Obtain additional manufacturer-level registration tables from SMMT and/or ONS (e.g. monthly or multi-year time-series of registrations by marque) so that I can build a panel dataset with many more observations per manufacturer.
+- Reuse the same pipeline defined in the `src/` modules (data preparation, feature engineering, RandomForestSalesClassifier) on this larger dataset, keeping the same business question of predicting high vs low performers.
+- If the time dimension is rich enough, experiment with a simple deep learning model (for example, an MLP on lagged features or a small LSTM over monthly registrations) to showcase more advanced methods on the extended dataset, while still staying within the original project scope.
+
+This complementary dataset plan directly follows my supervisor's recommendation to work with larger, time-series style data to better test model generalisation and to justify the use of more complex models.
+
 MSc Data Science, University of Hertfordshire
