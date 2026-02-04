@@ -86,9 +86,9 @@ Target: `Purchase` (high vs low manufacturer).
 
 A dedicated markdown section interprets this: the task is almost deterministic on this small sample because YTD/market‑share features nearly fully determine the label, so perfect scores are not strong evidence of generalisation.
 
-## Notebook 02 – DVLA Lags and Regression
+## Notebook 02 _EDA_SMMT 
 
-**File:** `notebooks/02_DVLA_lags_and_regression.ipynb`
+**File:** `notebooks/01_EDA_SMMT.ipynb`
 
 ### DVLA data preparation
 
@@ -144,9 +144,9 @@ To satisfy the supervisor’s recommendation on macroeconomic context:
 
 A short narrative comments on whether the macro variable adds signal or remains dominated by lag features.
 
-## Notebook 03 – Macro and Time-Series Models
+## Notebook 03 _DVLA_lagged_regression&03_Macro_and_time_series_models.ipynb
 
-**File:** `notebooks/03_Macro_and_time_series_models.ipynb`
+**File:** `notebooks/02_DVLA_lagged_regression&03_Macro_and_time_series_models.ipynb`
 
 ### Aggregated quarterly time series
 
@@ -177,8 +177,8 @@ forecast = m.predict(future)
 │       └── dvla_with_lags_long.csv
 ├── notebooks/
 │   ├── 01_SMMT_2025_EDA_and_RF.ipynb
-│   ├── 02_DVLA_lags_and_regression.ipynb
-│   └── 03_Macro_and_time_series_models.ipynb
+│   ├── 02_01_EDA_SMMT.ipynb
+│   └── 03_DVLA_lags_and_regression&Macro_and_time_series_models.ipynb
 ├── src/
 │   ├── dsutils.py
 │   ├── data_preparation.py
