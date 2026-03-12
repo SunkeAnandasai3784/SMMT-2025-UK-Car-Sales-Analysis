@@ -47,113 +47,88 @@ SMMT-2025-UK-Car-Sales-Analysis/
 ├─ README.md
 └─ requirements.txt (or environment.yml)
 
-3. Methods
-3.1 SMMT classification (high vs low marques)
-Target definition
+## 3. Methods
 
-Use 2025 year‑to‑date registrations (ytd2025) by marque.
+### 3.1 SMMT classification (high vs low marques)
 
-Compute the 40th and 60th percentiles of ytd2025.
+**Target definition**
 
-Label:
+- Use 2025 year‑to‑date registrations (`ytd2025`) by marque.
+- Compute the 40th and 60th percentiles of `ytd2025`.
+- Labels:
+  - `1` – marques in the **top 40%** by volume (high).
+  - `0` – marques in the **bottom 40%** (low).
+  - Middle 20% are dropped to keep a clean decision boundary.
 
-1 = marques in the top 40% by volume (high).
+**Features**
 
-0 = marques in the bottom 40% (low).
+- 2025 and 2024 year‑to‑date volumes and market shares.
+- December 2025 and 2024 volumes and shares.
+- Year‑on‑year percentage changes.
+- Keep the features with the strongest correlation to the target
+  (e.g. 2025 YTD volume, share and December volume).
 
-Middle 20% are dropped to keep a clean decision boundary.
+**Models**
 
-Features
+- Logistic Regression  
+- Random Forest Classifier  
+- Gradient Boosting Classifier  
 
-2025 and 2024 year‑to‑date volumes and market shares.
+**Evaluation**
 
-December 2025 and 2024 volumes and shares.
+- Stratified train/test split (balanced 23 vs 23 labels).
+- Accuracy, Precision, Recall, F1‑score.
+- ROC‑AUC on the test set.
+- 5‑fold cross‑validated ROC‑AUC.
+- Validation log‑loss and ROC curves.
 
-Year‑on‑year percentage changes.
+> **Interpretation note**  
+> The labelled snapshot contains only 46 manufacturers and the chosen
+> features separate the classes very clearly. As a result, all three
+> models achieve ROC‑AUC close to 1.0 on the test split and in
+> cross‑validation. These scores should be viewed as **exploratory**
+> rather than production‑ready forecasting performance.
 
-Features with the strongest correlation to the target are kept
-(e.g. 2025 YTD volume, share and December volume).
+---
 
-Models
+### 3.2 DfT VEH0160 panel regression
 
-Logistic Regression.
-
-Random Forest Classifier.
-
-Gradient Boosting Classifier.
-
-Evaluation
-
-Stratified train/test split (balanced 23 vs 23 labels).
-
-Accuracy, Precision, Recall, F1‑score.
-
-ROC‑AUC on the test set.
-
-5‑fold cross‑validated ROC‑AUC.
-
-Validation log‑loss and ROC curves.
-
-Interpretation note:
-The labelled snapshot contains only 46 manufacturers and the chosen
-features separate the classes very clearly. As a result, all three
-models achieve ROC‑AUC close to 1.0 on the test split and in
-cross‑validation. These scores should be viewed as exploratory and
-not as production‑ready forecasting performance.
-
-3.2 DfT VEH0160 panel regression
-Filter the VEH0160 CSV to cars only.
-
-Reshape from wide (columns for each quarter) to long
-(Make, date, Licences).
-
-Aggregate to Make–date pairs and build:
-
-Lagged licences (1, 2 and 4 quarters).
-
-Year‑on‑year growth rates.
-
-Train a Random Forest Regressor on these features.
-
-Report 
-R
-2
-R 
-2
- , MAE and RMSE on a held‑out test set.
+- Filter the VEH0160 CSV to **cars only**.
+- Reshape from wide (columns for each quarter) to long
+  (`Make`, `date`, `Licences`).
+- Aggregate to `Make`–`date` pairs and build:
+  - Lagged licences (1, 2 and 4 quarters).
+  - Year‑on‑year growth rates.
+- Train a **Random Forest Regressor** on these features.
+- Report \(R^2\), MAE and RMSE on a held‑out test set.
 
 This shows how past licensed stock and recent growth help explain the
 next quarter’s licences for each make.
 
-4. How to run
-Clone the repository:
+---
 
-bash
-git clone https://github.com/SunkeAnandasai3784/SMMT-2025-UK-Car-Sales-Analysis.git
-cd SMMT-2025-UK-Car-Sales-Analysis
-Create a Python environment and install dependencies:
+## 4. How to run
 
-bash
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/SunkeAnandasai3784/SMMT-2025-UK-Car-Sales-Analysis.git
+   cd SMMT-2025-UK-Car-Sales-Analysis
 pip install -r requirements.txt
-(or use environment.yml with conda env create -f environment.yml.)
-
-Start Jupyter:
-
-bash
-jupyter notebook
 Open 01_SMMT_2025_EDA_and_Models.ipynb and run all cells.
 
 The notebook is designed to run end‑to‑end as long as the data files are
 present under data/.
 
 5. Data sources
-SMMT car registrations:
+SMMT car registrations
 “REGISTRATIONS OF NEW CARS IN THE UNITED KINGDOM – December and
 year‑to‑date 2024–2025” (Cars12_2025.xlsx).
 
-DfT VEH0160:
-UK Department for Transport “Vehicle licensing statistics –
-VEH0160: Licensed cars by make and quarter, Great Britain”.
+DfT VEH0160
+UK Department for Transport, “Vehicle licensing statistics –
+VEH0160: Licensed cars by make and quarter, Great Britain”
+(VEH0160UK.csv).
 
 Both are official sources; this repository uses them purely for
 non‑commercial, educational analysis.
