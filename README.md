@@ -1,139 +1,106 @@
-# SMMT 2025 – UK Car Sales Analysis
+# SMMT 2025 & DfT VEH0160 – UK Car Sales and Registrations Analysis
 
-This repository contains an end‑to‑end analysis of 2025 UK car sales by
-manufacturer using two official data sources:
+Code and notebook for the SMMT 2025 + DfT VEH0160 analysis of UK new car registrations, combining snapshot and panel data to model manufacturer‑level demand.
 
-- **SMMT** (Society of Motor Manufacturers and Traders): new car registrations
-  by marque for December and year‑to‑date 2024–2025.
-- **DfT VEH0160** (UK Department for Transport): quarterly licensed vehicles
-  by make, 2014–2025.
+## Project overview
 
-The goal is to understand which manufacturers are performing strongly in
-2025 and how that relates to longer‑run trends in the licensed vehicle
-stock.
+This project uses two official UK data sources:  
+- SMMT car registrations by marque for December and year‑to‑date 2024–2025 (`Cars_12_2025.xlsx`).  
+- Vehicle licensing statistics (DfT `VEH0160_UK`) from GOV.UK.  
 
----
+The SMMT Excel is a 2025 snapshot with 57 manufacturers, used for cross‑sectional analysis and classification of “high vs low” performers.  
+The VEH0160 CSV is a quarterly time‑series panel of licensed vehicles by make and fuel type; after reshaping to long format and creating lags, it is used for regression, classification and forecasting models.  
+Both datasets come from official organisations (SMMT and UK government / DfT) and measure related but different concepts (new registrations vs licensed stock), so they complement each other.
 
-## 1. Project overview
+> Raw SMMT and DfT files are not included in this repository. Users should download them from the official SMMT site and the GOV.UK vehicle‑licensing statistics page.
 
-The analysis is organised in two parts inside a single Jupyter notebook:
+## Data sources
 
-1. **SMMT 2025 snapshot – classification**
-   - Clean the SMMT Excel into a manufacturer‑level table.
-   - Explore top marques, growth rates and market shares.
-   - Build a **binary classifier** to label each marque as
-     “high‑volume” vs “low‑volume” in 2025.
+- **SMMT new car registrations (2025 snapshot)**  
+  - Provider: Society of Motor Manufacturers and Traders (SMMT).  
+  - File: `Cars_12_2025.xlsx`.  
+  - Role: High‑level manufacturer snapshot used for EDA and a binary `Purchase` label based on 2025 year‑to‑date registrations and market share.  
 
-2. **DfT VEH0160 panel – forecasting**
-   - Reshape the wide VEH0160 CSV into a long **make–quarter** panel.
-   - Create lags and growth rates in licensed vehicles.
-   - Fit a **Random Forest regression** to model short‑term changes in
-     the licensed stock.
+- **DfT VEH0160 – Licensed vehicles by body type and fuel**  
+  - Provider: UK Department for Transport (DfT), table VEH0160 “Licensed vehicles by body type and fuel”.  
+  - File: `df_VEH0160_UK.csv` (downloaded from GOV.UK and loaded in the notebook).  
+  - Role: Reshaped into a quarterly panel by make and date, with lagged licences and year‑on‑year growth features for modelling manufacturer‑level dynamics.  
 
-The conclusion compares what we learn from a **single‑year snapshot**
-(SMMT) with the **long‑run panel** (DfT).
+## Methods
 
----
+### SMMT 2025 manufacturer snapshot – EDA and classification
 
-## 2. Repository structure
+- Load and clean the SMMT Excel into a manufacturer‑level table (`smmt_clean`) with December and year‑to‑date volumes, shares and growth rates.  
+- Build a `High_Sales` / `Purchase` label from `ytd_2025` (top 40% vs bottom 40%, middle 20% dropped), giving a balanced 23/23 split for modelling.  
+- Run EDA on: top‑10 manufacturers (2024 vs 2025 volumes and growth), fuel‑type distribution (Petrol, Diesel, HEV, PHEV, BEV) using published SMMT totals, and a correlation heatmap of numeric features vs `Purchase`.  
+- Train Logistic Regression, Random Forest and Gradient Boosting classifiers on the SMMT snapshot, showing that with only 57 observations all three can achieve apparent ROC‑AUC of 1.0, highlighting the overfitting risk.  
 
-```text
-SMMT-2025-UK-Car-Sales-Analysis/
-├─ 01_SMMT_2025_EDA_and_Models.ipynb   # main analysis notebook
-├─ data/
-│  ├─ Cars12_2025.xlsx                 # SMMT registrations by marque
-│  └─ VEH0160UK.csv                    # DfT vehicle licensing statistics
-├─ figures/                            # optional: exported charts
-├─ README.md
-└─ requirements.txt (or environment.yml)
+### DfT VEH0160 panel – reshaping and feature engineering
 
-## 3. Methods
+- Filter VEH0160 to cars only and melt the wide quarterly columns (`2015 Q1` … `2025 Q3`) into a long table with `BodyType`, `Make`, `GenModel`, `Model`, `Fuel`, `period`, `Licences`.  
+- Split `period` into `Year` and `Quarter`, build a quarterly `date` index, sort by `Make` and date, and aggregate to a `Make`–`date` panel (`veh_panel`).  
+- Create time‑series features: `Licences_lag1`, `Licences_lag2`, `Licences_lag4` (within‑make lags) and `Licences_yoy` (year‑on‑year growth vs four quarters ago).  
+- Drop rows with missing lags, ending with 5,680 make–quarter rows and, after cleaning infinities/NaNs, 4,754 rows with complete feature vectors.  
 
-### 3.1 SMMT classification (high vs low marques)
+### Random Forest panel model (regression and tuned classifier)
 
-**Target definition**
+- Regression setup: predictors = `[Licences_lag1, Licences_lag2, Licences_lag4, Licences_yoy]`, target = `Licences`.  
+- Train a `RandomForestRegressor` (300 trees) with an 80/20 split; the model achieves roughly \(R^2 \approx 0.99\), MAE around 300 and RMSE a little above 1,100 licences on the test set.  
+- Feature importance shows that `Licences_lag2` and `Licences_lag4` dominate, indicating strong persistence in registrations; `Licences_yoy` and `Licences_lag1` play a smaller role.  
 
-- Use 2025 year‑to‑date registrations (`ytd2025`) by marque.
-- Compute the 40th and 60th percentiles of `ytd2025`.
-- Labels:
-  - `1` – marques in the **top 40%** by volume (high).
-  - `0` – marques in the **bottom 40%** (low).
-  - Middle 20% are dropped to keep a clean decision boundary.
+- Expanded classification pipeline on the panel:  
+  - Use a balanced binary target from panel features (around 246 observations, roughly 126 vs 120) with 5 input features.  
+  - Perform a stratified 75/25 split (train 184, test 62), replacing the earlier 45/12 split.  
+  - Apply `GridSearchCV` (5‑fold CV) over RandomForest hyper‑parameters (n_estimators, max_depth, max_features, min_samples_split, min_samples_leaf).  
+  - Best model example: `n_estimators=50`, `max_depth=5`, `max_features='sqrt'`, `min_samples_split=2`, `min_samples_leaf=1`, with CV ROC‑AUC and test ROC‑AUC of 1.0 and low log loss, plus clean confusion matrix.  
 
-**Features**
+### Time‑series baseline: VAUXHALL SARIMA example
 
-- 2025 and 2024 year‑to‑date volumes and market shares.
-- December 2025 and 2024 volumes and shares.
-- Year‑on‑year percentage changes.
-- Keep the features with the strongest correlation to the target
-  (e.g. 2025 YTD volume, share and December volume).
+- Select VAUXHALL from the panel (41 quarterly observations between 2015 Q3 and 2025 Q3).  
+- Fit a seasonal ARIMA model such as `SARIMA(1,1,1)×(0,1,1,4)` on the first 80% of the series and forecast the remaining 20%.  
+- The SARIMA model’s test RMSE is in the mid‑thousands of licences, illustrating a traditional time‑series benchmark against which the Random Forest panel approach can be compared.  
 
-**Models**
+### Before vs after – addressing data size, model focus and tuning
 
-- Logistic Regression  
-- Random Forest Classifier  
-- Gradient Boosting Classifier  
+The notebook contrasts the original SMMT‑only setup with the expanded DfT panel and tuned Random Forest classifier:
 
-**Evaluation**
+| Aspect                | SMMT‑only (before)           | Expanded panel (after)                   |
+|-----------------------|-----------------------------|------------------------------------------|
+| Total observations    | 57 manufacturers            | 246 make–quarter rows                    |
+| Train / test sizes    | 45 / 12                     | 184 / 62                                 |
+| Data source           | SMMT snapshot only          | DfT VEH0160 panel (2014–2025)            |
+| Models                | LR, RF, GB (all untuned)    | Random Forest (focused, tuned)           |
+| Hyper‑parameter tuning| None                        | GridSearchCV (5‑fold CV)                 |
+| CV / test ROC‑AUC     | ~1.0 (small‑n, overfit‑prone)| 1.0 on a much larger panel              |
 
-- Stratified train/test split (balanced 23 vs 23 labels).
-- Accuracy, Precision, Recall, F1‑score.
-- ROC‑AUC on the test set.
-- 5‑fold cross‑validated ROC‑AUC.
-- Validation log‑loss and ROC curves.
+This directly responds to earlier concerns about small sample size, lack of tuning and diffuse model focus by moving to a richer panel and concentrating on one tuned Random Forest model.
 
-> **Interpretation note**  
-> The labelled snapshot contains only 46 manufacturers and the chosen
-> features separate the classes very clearly. As a result, all three
-> models achieve ROC‑AUC close to 1.0 on the test split and in
-> cross‑validation. These scores should be viewed as **exploratory**
-> rather than production‑ready forecasting performance.
+## How to run
 
----
+1. **Clone the repository**
 
-### 3.2 DfT VEH0160 panel regression
-
-- Filter the VEH0160 CSV to **cars only**.
-- Reshape from wide (columns for each quarter) to long
-  (`Make`, `date`, `Licences`).
-- Aggregate to `Make`–`date` pairs and build:
-  - Lagged licences (1, 2 and 4 quarters).
-  - Year‑on‑year growth rates.
-- Train a **Random Forest Regressor** on these features.
-- Report \(R^2\), MAE and RMSE on a held‑out test set.
-
-This shows how past licensed stock and recent growth help explain the
-next quarter’s licences for each make.
-
----
-
-## 4. How to run
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/SunkeAnandasai3784/SMMT-2025-UK-Car-Sales-Analysis.git
-   cd SMMT-2025-UK-Car-Sales-Analysis
+```bash
+git clone https://github.com/SunkeAnandasai3784/SMMT-2025-UK-Car-Sales-Analysis.git
+cd SMMT-2025-UK-Car-Sales-Analysis
 pip install -r requirements.txt
-Open 01_SMMT_2025_EDA_and_Models.ipynb and run all cells.
 
-The notebook is designed to run end‑to‑end as long as the data files are
-present under data/.
+SMMT-2025-UK-Car-Sales-Analysis/
+├── notebooks/
+│   └── 01_SMMT_2025_EDA_and_Models.ipynb
+├── data/
+│   ├── raw/        # Cars_12_2025.xlsx, VEH0160 CSV (not tracked)
+│   └── processed/  # cleaned / panel-ready CSVs (optional)
+├── src/
+│   ├── preprocessing/
+│   ├── models/
+│   └── viz/
+├── reports/
+│   └── figures/    # feature_importance.png, roc_curve_tuned.png, etc.
+└── README.md
 
-5. Data sources
-SMMT car registrations
-“REGISTRATIONS OF NEW CARS IN THE UNITED KINGDOM – December and
-year‑to‑date 2024–2025” (Cars12_2025.xlsx).
+Acknowledgements
+Society of Motor Manufacturers and Traders (SMMT) for UK new car registration statistics.
 
-DfT VEH0160
-UK Department for Transport, “Vehicle licensing statistics –
-VEH0160: Licensed cars by make and quarter, Great Britain”
-(VEH0160UK.csv).
+UK Department for Transport for VEH0160 vehicle‑licensing statistics.
 
-Both are official sources; this repository uses them purely for
-non‑commercial, educational analysis.
-
-6. Contact
-Created by Anandasai Sunke as part of a data science project.
-If you have questions or suggestions, feel free to open an issue or
-reach out via GitHub.
+Project completed as part of MSc studies at the University of Hertfordshire.
