@@ -1,106 +1,152 @@
-# SMMT 2025 & DfT VEH0160 – UK Car Sales and Registrations Analysis
+# Predicting Strong Growth in UK Car Registrations Using DfT VEH0160
 
-Code and notebook for the SMMT 2025 + DfT VEH0160 analysis of UK new car registrations, combining snapshot and panel data to model manufacturer‑level demand.
+This project analyses new car registrations in the UK using the **DfT df_VEH0160_UK** dataset, which reports vehicles registered for the first time by body type, make, generic model and model.  
+I focus on **Cars** and build a **Random Forest classifier** that predicts whether a manufacturer experiences **strong year‑on‑year growth** in registrations in a given quarter.
 
-## Project overview
+## Project structure
 
-This project uses two official UK data sources:  
-- SMMT car registrations by marque for December and year‑to‑date 2024–2025 (`Cars_12_2025.xlsx`).  
-- Vehicle licensing statistics (DfT `VEH0160_UK`) from GOV.UK.  
+- `01_SMMT_2025_EDA_and_Models.ipynb` – main notebook with data loading, EDA, feature engineering and modelling for df_VEH0160_UK.  
+- `data/df_VEH0160_UK.csv` – DfT Vehicles registered for the first time dataset (not committed if too large).  
+- `presentation/Anandasai-Sunke-24057259-Presentation.pptx` – final project presentation aligned with this notebook and README.  
 
-The SMMT Excel is a 2025 snapshot with 57 manufacturers, used for cross‑sectional analysis and classification of “high vs low” performers.  
-The VEH0160 CSV is a quarterly time‑series panel of licensed vehicles by make and fuel type; after reshaping to long format and creating lags, it is used for regression, classification and forecasting models.  
-Both datasets come from official organisations (SMMT and UK government / DfT) and measure related but different concepts (new registrations vs licensed stock), so they complement each other.
+## Data source
 
-> Raw SMMT and DfT files are not included in this repository. Users should download them from the official SMMT site and the GOV.UK vehicle‑licensing statistics page.
+The project uses one official UK dataset:
 
-## Data sources
+- **DfT df_VEH0160_UK – Vehicles registered for the first time**  
+  - Source: UK Department for Transport, Vehicle licensing statistics data files.  
+  - Scope used here: BodyType = **Cars** only.  
+  - Level: Make–quarter (aggregated from make, generic model and model).  
+  - Time span: roughly 2014 Q3 to 2025 Q3.  
 
-- **SMMT new car registrations (2025 snapshot)**  
-  - Provider: Society of Motor Manufacturers and Traders (SMMT).  
-  - File: `Cars_12_2025.xlsx`.  
-  - Role: High‑level manufacturer snapshot used for EDA and a binary `Purchase` label based on 2025 year‑to‑date registrations and market share.  
+No personal or individual‑level data is used; all records are aggregated counts by manufacturer and time period.
 
-- **DfT VEH0160 – Licensed vehicles by body type and fuel**  
-  - Provider: UK Department for Transport (DfT), table VEH0160 “Licensed vehicles by body type and fuel”.  
-  - File: `df_VEH0160_UK.csv` (downloaded from GOV.UK and loaded in the notebook).  
-  - Role: Reshaped into a quarterly panel by make and date, with lagged licences and year‑on‑year growth features for modelling manufacturer‑level dynamics.  
+## Aim
 
-## Methods
+The aim of the project is to:
 
-### SMMT 2025 manufacturer snapshot – EDA and classification
+- Detect **strong‑growth quarters** for each car manufacturer in the UK using only historical registration information.  
+- Build an **interpretable yet realistic** model (Random Forest) that avoids feature leakage and reports credible metrics (ROC‑AUC around 0.78 instead of unrealistic 1.0).  
 
-- Load and clean the SMMT Excel into a manufacturer‑level table (`smmt_clean`) with December and year‑to‑date volumes, shares and growth rates.  
-- Build a `High_Sales` / `Purchase` label from `ytd_2025` (top 40% vs bottom 40%, middle 20% dropped), giving a balanced 23/23 split for modelling.  
-- Run EDA on: top‑10 manufacturers (2024 vs 2025 volumes and growth), fuel‑type distribution (Petrol, Diesel, HEV, PHEV, BEV) using published SMMT totals, and a correlation heatmap of numeric features vs `Purchase`.  
-- Train Logistic Regression, Random Forest and Gradient Boosting classifiers on the SMMT snapshot, showing that with only 57 observations all three can achieve apparent ROC‑AUC of 1.0, highlighting the overfitting risk.  
+## Methodology
 
-### DfT VEH0160 panel – reshaping and feature engineering
+### 1. Pre‑processing & panel creation
 
-- Filter VEH0160 to cars only and melt the wide quarterly columns (`2015 Q1` … `2025 Q3`) into a long table with `BodyType`, `Make`, `GenModel`, `Model`, `Fuel`, `period`, `Licences`.  
-- Split `period` into `Year` and `Quarter`, build a quarterly `date` index, sort by `Make` and date, and aggregate to a `Make`–`date` panel (`veh_panel`).  
-- Create time‑series features: `Licences_lag1`, `Licences_lag2`, `Licences_lag4` (within‑make lags) and `Licences_yoy` (year‑on‑year growth vs four quarters ago).  
-- Drop rows with missing lags, ending with 5,680 make–quarter rows and, after cleaning infinities/NaNs, 4,754 rows with complete feature vectors.  
+1. Read `df_VEH0160_UK.csv` with the correct encoding.  
+2. Filter to `BodyType == "Cars"`.  
+3. Melt the wide quarterly columns into long format (Make–Quarter–Registered).  
+4. Extract `Year` and `QuarterNo` and create a `Date` at the end of each quarter.  
+5. Aggregate to a Make–Date panel: one row per manufacturer and quarter with total new registrations.  
 
-### Random Forest panel model (regression and tuned classifier)
+### 2. Feature engineering
 
-- Regression setup: predictors = `[Licences_lag1, Licences_lag2, Licences_lag4, Licences_yoy]`, target = `Licences`.  
-- Train a `RandomForestRegressor` (300 trees) with an 80/20 split; the model achieves roughly \(R^2 \approx 0.99\), MAE around 300 and RMSE a little above 1,100 licences on the test set.  
-- Feature importance shows that `Licences_lag2` and `Licences_lag4` dominate, indicating strong persistence in registrations; `Licences_yoy` and `Licences_lag1` play a smaller role.  
+On the Make–Date panel, I create:
 
-- Expanded classification pipeline on the panel:  
-  - Use a balanced binary target from panel features (around 246 observations, roughly 126 vs 120) with 5 input features.  
-  - Perform a stratified 75/25 split (train 184, test 62), replacing the earlier 45/12 split.  
-  - Apply `GridSearchCV` (5‑fold CV) over RandomForest hyper‑parameters (n_estimators, max_depth, max_features, min_samples_split, min_samples_leaf).  
-  - Best model example: `n_estimators=50`, `max_depth=5`, `max_features='sqrt'`, `min_samples_split=2`, `min_samples_leaf=1`, with CV ROC‑AUC and test ROC‑AUC of 1.0 and low log loss, plus clean confusion matrix.  
+- `Registered_lag1`, `Registered_lag2`, `Registered_lag4` – registrations 1, 2 and 4 quarters ago for each Make.  
+- `YoY_Growth` – difference between current registrations and those 4 quarters ago.  
+- `MA3` – 3‑quarter moving average of registrations (short‑term trend).  
 
-### Time‑series baseline: VAUXHALL SARIMA example
+### 3. Binary target (strong growth)
 
-- Select VAUXHALL from the panel (41 quarterly observations between 2015 Q3 and 2025 Q3).  
-- Fit a seasonal ARIMA model such as `SARIMA(1,1,1)×(0,1,1,4)` on the first 80% of the series and forecast the remaining 20%.  
-- The SARIMA model’s test RMSE is in the mid‑thousands of licences, illustrating a traditional time‑series benchmark against which the Random Forest panel approach can be compared.  
+To avoid trivial predictions, I define a **harder** target:
 
-### Before vs after – addressing data size, model focus and tuning
+- Compute `growth_rate = YoY_Growth / |Registered_lag4|`.  
+- Set `Target = 1` if `growth_rate > 0.10` (more than 10% year‑on‑year growth), otherwise `Target = 0`.  
 
-The notebook contrasts the original SMMT‑only setup with the expanded DfT panel and tuned Random Forest classifier:
+This means the model predicts **strong growth**, not just any positive change.
 
-| Aspect                | SMMT‑only (before)           | Expanded panel (after)                   |
-|-----------------------|-----------------------------|------------------------------------------|
-| Total observations    | 57 manufacturers            | 246 make–quarter rows                    |
-| Train / test sizes    | 45 / 12                     | 184 / 62                                 |
-| Data source           | SMMT snapshot only          | DfT VEH0160 panel (2014–2025)            |
-| Models                | LR, RF, GB (all untuned)    | Random Forest (focused, tuned)           |
-| Hyper‑parameter tuning| None                        | GridSearchCV (5‑fold CV)                 |
-| CV / test ROC‑AUC     | ~1.0 (small‑n, overfit‑prone)| 1.0 on a much larger panel              |
+### 4. Feature matrix
 
-This directly responds to earlier concerns about small sample size, lack of tuning and diffuse model focus by moving to a richer panel and concentrating on one tuned Random Forest model.
+The final feature matrix **does not include** `YoY_Growth`, to avoid label leakage:
+
+- `X = [Registered_lag1, Registered_lag2, Registered_lag4, MA3]`  
+- `y = Target`  
+
+All infinities and missing values are cleaned and replaced before modelling.
+
+### 5. Train–validation–test split
+
+- Stratified split on `Target` into:
+  - 56.25% **train**
+  - 18.75% **validation**
+  - 25% **test**  
+
+The validation set is used for baseline vs tuned model comparison; the test set is only used once at the end.
+
+## Model
+
+I use **one main model family** for this dataset: `RandomForestClassifier` from scikit‑learn.
+
+### Baseline Random Forest
+
+- `n_estimators = 50`  
+- `max_depth = 4`  
+- `min_samples_leaf = 5`  
+- `class_weight = "balanced"`  
+- `random_state = 42`  
+
+### Hyper‑parameter tuning
+
+I tune a **smaller** Random Forest using `GridSearchCV` with 5‑fold cross‑validation, optimising ROC‑AUC.
+
+Grid:
+
+- `n_estimators: [30, 60]`  
+- `max_depth: [3, 4, 5]`  
+- `min_samples_split: [4, 6]`  
+- `min_samples_leaf: [3, 5]`  
+- `max_features: ["sqrt"]`  
+
+**Best parameters**
+
+- `max_depth = 5`  
+- `max_features = "sqrt"`  
+- `min_samples_leaf = 3`  
+- `min_samples_split = 4`  
+- `n_estimators = 60`  
+- Best cross‑validated ROC‑AUC ≈ **0.807**  
+
+## Results
+
+### Baseline RF
+
+- Train ROC‑AUC ≈ 0.815  
+- Validation ROC‑AUC ≈ 0.764  
+- Validation accuracy ≈ 0.578  
+- Very high recall for the strong‑growth class (≈0.918) but lower precision (≈0.431).  
+
+### Tuned RF (final model)
+
+- Validation ROC‑AUC ≈ **0.795**  
+- Test ROC‑AUC ≈ **0.780**  
+- Validation & test accuracy ≈ **0.61**  
+- Best CV ROC‑AUC ≈ **0.807**  
+
+**Interpretation**
+
+- ROC‑AUC around 0.78 shows the model ranks strong‑growth quarters significantly better than random (0.5) but is far from perfect, which is realistic for noisy demand data.  
+- Feature importance highlights `MA3` and `Registered_lag4` as dominant predictors, consistent with business intuition that both recent trend and last year’s level matter.  
+- Learning curves show a small gap between train and validation performance, indicating moderate but controlled overfitting.
+
+## Visualisations
+
+The notebook and presentation include:
+
+- Class balance chart for the strong‑growth target.  
+- Correlation heat maps (inputs only, and inputs + Target).  
+- Baseline confusion matrix and feature importance plot.  
+- Learning curve (train vs validation ROC‑AUC).  
+- ROC curves for tuned RF on train+validation and test sets.  
+
+## Limitations & future work
+
+- Only internal lag features are used; no external macroeconomic or policy variables are included.  
+- The 10% growth threshold for defining “strong growth” is somewhat arbitrary and could be tuned for different business cases.  
+- Future work could explore gradient boosting models, probabilistic calibration, threshold optimisation, and the inclusion of additional explanatory variables (e.g., fuel type mix, economic indicators).  
 
 ## How to run
 
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/SunkeAnandasai3784/SMMT-2025-UK-Car-Sales-Analysis.git
-cd SMMT-2025-UK-Car-Sales-Analysis
-pip install -r requirements.txt
-
-SMMT-2025-UK-Car-Sales-Analysis/
-├── notebooks/
-│   └── 01_SMMT_2025_EDA_and_Models.ipynb
-├── data/
-│   ├── raw/        # Cars_12_2025.xlsx, VEH0160 CSV (not tracked)
-│   └── processed/  # cleaned / panel-ready CSVs (optional)
-├── src/
-│   ├── preprocessing/
-│   ├── models/
-│   └── viz/
-├── reports/
-│   └── figures/    # feature_importance.png, roc_curve_tuned.png, etc.
-└── README.md
-
-Acknowledgements
-Society of Motor Manufacturers and Traders (SMMT) for UK new car registration statistics.
-
-UK Department for Transport for VEH0160 vehicle‑licensing statistics.
-
-Project completed as part of MSc studies at the University of Hertfordshire.
+1. Clone the repository.  
+2. Download `df_VEH0160_UK.csv` from the DfT Vehicle licensing statistics data files page and place it in `data/`.  
+3. Open `01_SMMT_2025_EDA_and_Models.ipynb` in Jupyter/Colab.  
+4. Run all cells in order; paths and `encoding="latin1"` are already set up for df_VEH0160_UK.
